@@ -1,10 +1,10 @@
-/*!gcc {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o out; ./out */
-/*!clang++ {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o out.exe; ./out.exe */
-/*!clang -ansi -pedantic-errors {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o out.exe; ./out.exe */
-/*!clang {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o out.exe; ./out.exe */
-/*!g++ -std=c++11 {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o out; ./out */
-/*!g++ -ansi -pedantic-errors {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o out; ./out */
-/*!gcc  -ansi -pedantic-errors {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o out; ./out */
+/*!gcc {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o slocer; ./slocer */
+/*!clang++ {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o slocer; ./slocer */
+/*!clang -ansi -pedantic-errors {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o slocer; ./slocer */
+/*!clang {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o slocer; ./slocer */
+/*!g++ -std=c++11 {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o slocer; ./slocer */
+/*!g++ -ansi -pedantic-errors {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o slocer; ./slocer */
+/*!gcc  -ansi -pedantic-errors {0} -I. -I../../include/ -I../include/ -I../../../libcester/include -o slocer; ./slocer */
 
 #include <exotic/cline/font_effect.h>
 #include <exotic/cline/cliarg.h>
@@ -24,7 +24,7 @@ typedef struct Slocer {
     XAllocator allocator;
     size_t file_ext_count;
     long source_line_count;
-    bool last_char_is_whitespace;
+    bool new_line_oc;
     char **supported_file_extensions;
 } Slocer;
 
@@ -65,10 +65,14 @@ bool fio_is_directory(const char *path) {
 bool read_file_char(void *param, char ch) {
     Slocer *slocer = (Slocer *) param;
     if (ch == '\n') {
-        slocer->source_line_count++;
-        if (!slocer->last_char_is_whitespace) slocer->line_count++;
+        slocer->line_count++;
+        if (slocer->new_line_oc == 0) slocer->source_line_count++;
     }
-    slocer->last_char_is_whitespace = xbound_char_is_white_space(ch);
+    if (ch == '\n') {
+        slocer->new_line_oc++;
+    } else if (slocer->new_line_oc > 0 && !xbound_char_is_white_space(ch)) {
+        slocer->new_line_oc--;
+    }
     return TRUE;
 }
 
@@ -99,11 +103,11 @@ void read_file(Slocer *slocer, char *file) {
     if (slocer->verbose) {
         debug("Reading the file: ", file);
     }
+    slocer->new_line_oc = 0;
     if (fio_read_file_chars_cb_from_path2(file, read_file_char, slocer) != XTD_OK) {
         warn("Unable to read the file: ", file);
     } else {
         if (slocer->line_count > 0) slocer->line_count++;
-        if (slocer->source_line_count > 0) slocer->source_line_count++;
         slocer->file_count++;
     }    
 }
@@ -131,8 +135,6 @@ void read_file_or_directory(Slocer *slocer, char *path) {
             warn("File with unsupported file extension: ", path);
         }
         
-    } else {
-        warn("Unknown file type: ", path);
     }
 }
 
@@ -155,7 +157,7 @@ int main(int argc, char **argv) {
 
     init_xallocator(&allocator);
     if (init_cline_arg(&allocator, &cline_arg, "slocer") != XTD_OK) return fatal_error("Failed to initialize argument parser");
-    if (cline_arg_set_description(cline_arg, "Count the number of line in your project or source file, This does not give regard to comment.") != XTD_OK) goto fail_cline_arg;
+    if (cline_arg_set_description(cline_arg, "Count the number of line in your project or source file, This does not give regard to comment.\nMIT License Copyright (c) 2021, Adewale Azeez") != XTD_OK) goto fail_cline_arg;
     if (cline_arg_add_option(cline_arg, XTD_NULL, "-h<:>--help", "Print this help message", FALSE) != XTD_OK) goto fail_cline_arg;
     if (cline_arg_add_option(cline_arg, XTD_NULL, "-r<:>--recurse", "Recursively count the lines in file and sub folder recursively", FALSE) != XTD_OK) goto fail_cline_arg;
     if (cline_arg_add_option(cline_arg, XTD_NULL, "-v<:>--verbose", "Print verbose detail in the terminal", FALSE) != XTD_OK) goto fail_cline_arg;
@@ -170,9 +172,9 @@ int main(int argc, char **argv) {
     slocer->line_count = 0;
     slocer->source_line_count = 0;
     slocer->allocator = allocator;
-    slocer->last_char_is_whitespace = FALSE;
     slocer->supported_file_extensions = XTD_NULL;
-    slocer->verbose = cline_arg_has_option(cline_arg, XTD_NULL, "--verbose");
+    //slocer->verbose = TRUE;
+    slocer->verbose = cline_arg_has_option(cline_arg, XTD_NULL, "-v");
     slocer->recurse = cline_arg_has_option(cline_arg, XTD_NULL, "-r");
     if (!slocer) goto fail_slocer_init;
     slocer->file_ext_count = cline_arg_get_option_values(cline_arg, XTD_NULL, "--ext", &slocer->supported_file_extensions);
