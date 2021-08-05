@@ -18,6 +18,7 @@
 
 typedef struct Slocer {
     bool recurse;
+    bool verbose;
     long line_count;
     long source_line_count;
     bool last_char_is_whitespace;
@@ -36,6 +37,10 @@ int fatal_error(char *msg) {
 
 void warn(char *msg, char *sup1) {
     fprintf(stdout, "%s%s%s%s\n", CLINE_FE(CLINE_FE_FOREGROUND_YELLOW), msg, sup1, CLINE_FE(CLINE_FE_RESET));
+}
+
+void debug(char *msg, char *sup1) {
+    fprintf(stdout, "%s%s%s%s\n", CLINE_FE(CLINE_FE_FOREGROUND_CYAN), msg, sup1, CLINE_FE(CLINE_FE_RESET));
 }
 
 #ifndef fio_is_regular_file
@@ -82,12 +87,16 @@ void read_directory(Slocer *slocer, char *path) {
         full_path = xstring_cstr_concat_cstr(slocer->allocator, path, "/");
         full_path = xstring_cstr_concat_cstr_free_old(slocer->allocator, full_path, directory_child->d_name);
         read_file_or_directory(slocer, full_path);
+        //debug("Reading the file: ", full_path);
         slocer->allocator.memory_free(full_path);
     }
     closedir(directory);
 }
 
 void read_file(Slocer *slocer, char *file) {
+    if (slocer->verbose) {
+        debug("Reading the file: ", file);
+    }
     if (fio_read_file_chars_cb_from_path2(file, read_file_char, slocer) != XTD_OK) {
         warn("Unable to read the file: ", file);
     } else {
@@ -97,10 +106,10 @@ void read_file(Slocer *slocer, char *file) {
 }
 
 void read_file_or_directory(Slocer *slocer, char *path) {
-    if (fio_is_regular_file(path)) {
-        read_file(slocer, path);
-    } else if (fio_is_directory(path) && (slocer->recurse || slocer->line_count == 0)) {
+    if (fio_is_directory(path) && (slocer->recurse || slocer->line_count == 0)) {
         read_directory(slocer, path);
+    } else if (fio_is_regular_file(path)) {
+        read_file(slocer, path);
     }
 }
 
@@ -125,6 +134,7 @@ int main(int argc, char **argv) {
     if (cline_arg_set_description(cline_arg, "Count the number of line in your project or source file, This does not give regard to comment.") != XTD_OK) goto fail_cline_arg;
     if (cline_arg_add_option(cline_arg, XTD_NULL, "-h<:>--help", "Print this help message", FALSE) != XTD_OK) goto fail_cline_arg;
     if (cline_arg_add_option(cline_arg, XTD_NULL, "-r<:>--recurse", "Recursively count the lines in file and sub folder recursively", FALSE) != XTD_OK) goto fail_cline_arg;
+    if (cline_arg_add_option(cline_arg, XTD_NULL, "-v<:>--verbose", "Print verbose detail in the terminal", FALSE) != XTD_OK) goto fail_cline_arg;
     if (cline_arg_collect_orphans(cline_arg, "source", TRUE) != XTD_OK) goto fail_cline_arg;
     if (cline_arg_section_help(cline_arg, XTD_NULL, XTD_NULL, &help_text) != XTD_OK) goto fail_cline_arg;
     if ((status = cline_arg_parse_in_range(cline_arg, 1, argc, argv)) != XTD_OK) goto fail_cline_arg_parser;
@@ -135,6 +145,7 @@ int main(int argc, char **argv) {
     slocer->source_line_count = 0;
     slocer->allocator = allocator;
     slocer->last_char_is_whitespace = FALSE;
+    slocer->verbose = cline_arg_has_option(cline_arg, XTD_NULL, "-v");
     slocer->recurse = cline_arg_has_option(cline_arg, XTD_NULL, "-r");
     if (!slocer) goto fail_slocer_init;
     size = cline_arg_get_orphan_values(cline_arg, &values);
