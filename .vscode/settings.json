@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "font_effect.h": "c",
+        "cliarg.h": "c",
+        "cester.h": "c",
+        "fs.h": "c",
+        "stat.h": "c",
+        "xtypes_bounds.h": "c"
+    }
+}
